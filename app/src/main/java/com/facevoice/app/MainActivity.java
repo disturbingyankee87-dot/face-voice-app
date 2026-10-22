@@ -1,43 +1,82 @@
 package com.facevoice.app;
 
+import android.Manifest;
 import android.app.Activity;
-import android.os.Bundle;
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.media.MediaPlayer;
+import android.media.MediaRecorder;
+import android.media.PlaybackParams;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.Voice;
 import android.view.Gravity;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.Toast;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import java.io.File;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
 
     private static final int REQUEST_GALLERY = 100;
     private static final int REQUEST_CAMERA = 101;
+    private static final int REQUEST_MICROPHONE = 102;
 
     private ImageView photoPreview;
     private Bitmap originalBitmap;
     private Bitmap currentBitmap;
 
+    private MediaRecorder recorder;
+    private MediaPlayer player;
+    private File recordingFile;
+    private boolean isRecording = false;
+    private String selectedEffect = "Normal";
+
+    private TextToSpeech textToSpeech;
+    private boolean ttsReady = false;
+    private Voice selectedVoice;
+
+    private TextView recordingStatus;
+    private EditText speechInput;
+    private TextView selectedVoiceLabel;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         showHome();
+
+        textToSpeech = new TextToSpeech(this, status -> {
+            if (status == TextToSpeech.SUCCESS) {
+                ttsReady = true;
+                textToSpeech.setLanguage(Locale.getDefault());
+            } else {
+                toast("Text-to-speech is unavailable on this device");
+            }
+        });
     }
 
     private LinearLayout createLayout() {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setGravity(Gravity.CENTER);
-        layout.setPadding(24, 24, 24, 24);
+        layout.setPadding(24, 20, 24, 24);
         layout.setBackgroundColor(Color.rgb(18, 20, 32));
         return layout;
     }
@@ -47,137 +86,105 @@ public class MainActivity extends Activity {
         view.setText(text);
         view.setTextSize(size);
         view.setTextColor(Color.WHITE);
-        view.setGravity(Gravity.CENTER);
-        view.setPadding(0, 8, 0, 8);
+        view.setPadding(4, 8, 4, 8);
         return view;
     }
 
-    private Button makeButton(String text) {
+    private Button makeButton(String text, Runnable action) {
         Button button = new Button(this);
         button.setText(text);
+        button.setOnClickListener(v -> action.run());
         return button;
     }
 
     private void showHome() {
         LinearLayout layout = createLayout();
+        layout.setGravity(Gravity.CENTER);
 
-        layout.addView(makeText("FACE & VOICE STUDIO", 26));
-        layout.addView(makeText("Choose your creative effect", 16));
+        TextView title = makeText("FACE & VOICE STUDIO", 27);
+        title.setGravity(Gravity.CENTER);
 
-        Button face = makeButton("Face Effects");
-        Button voice = makeButton("Voice Effects");
+        TextView subtitle = makeText(
+                "Create funny photos and transform your voice", 16);
+        subtitle.setGravity(Gravity.CENTER);
 
-        face.setOnClickListener(v -> showFaceScreen());
-        voice.setOnClickListener(v -> showVoiceScreen());
+        layout.addView(title);
+        layout.addView(subtitle);
 
-        layout.addView(face);
-        layout.addView(voice);
+        layout.addView(makeButton("Face Effects", this::showFaceScreen));
+        layout.addView(makeButton("Voice Effects", this::showVoiceScreen));
+
         setContentView(layout);
     }
 
     private void showFaceScreen() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout layout = createLayout();
-        layout.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
 
-        layout.addView(makeText("Face Effects Studio", 25));
-        layout.addView(makeText(
-                "Choose a photo, then apply an effect.", 16));
-
-        Button gallery = makeButton("Choose from Gallery");
-        Button camera = makeButton("Take a Photo");
+        layout.addView(makeButton("← Back to Home", this::showHome));
+        layout.addView(makeText("FACE EFFECTS", 24));
 
         photoPreview = new ImageView(this);
         photoPreview.setAdjustViewBounds(true);
         photoPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        photoPreview.setMinimumHeight(300);
-        photoPreview.setBackgroundColor(Color.rgb(35, 38, 52));
+        photoPreview.setMinimumHeight(240);
+        layout.addView(photoPreview);
 
-        gallery.setOnClickListener(v -> openGallery());
-        camera.setOnClickListener(v -> openCamera());
+        layout.addView(makeButton("Choose from Gallery", this::openGallery));
+        layout.addView(makeButton("Take a Photo", this::openCamera));
 
-        layout.addView(gallery);
-        layout.addView(camera);
-        layout.addView(photoPreview,
-                new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, 400));
-
-        layout.addView(makeText("BASIC FILTERS", 20));
+        layout.addView(makeText("Photo Filters", 18));
         addFilterButton(layout, "Original", "original");
         addFilterButton(layout, "Black & White", "bw");
         addFilterButton(layout, "Sepia", "sepia");
         addFilterButton(layout, "Brighten", "brighten");
         addFilterButton(layout, "Vintage", "vintage");
 
-        layout.addView(makeText("BEAUTY FILTERS", 20));
+        layout.addView(makeText("Beauty Effects", 18));
         addFilterButton(layout, "Beauty Smooth", "smooth");
-        addFilterButton(layout, "Beauty Brighten", "beauty");
+        addFilterButton(layout, "Beauty Brighten", "beautybright");
 
-        layout.addView(makeText("FUNNY FACE EFFECTS", 20));
+        layout.addView(makeText("Funny Face Effects", 18));
         addFilterButton(layout, "Big Head", "bighead");
         addFilterButton(layout, "Big Eyes", "bigeyes");
         addFilterButton(layout, "Funny Face", "funny");
 
-        // New face effects
-        layout.addView(makeText("MORE FACE EFFECTS", 20));
+        layout.addView(makeText("More Face Effects", 18));
         addFilterButton(layout, "Skinny Face", "skinny");
         addFilterButton(layout, "Wide Face", "wide");
         addFilterButton(layout, "Tiny Mouth", "tiny");
         addFilterButton(layout, "Long Nose", "nose");
 
-        Button save = makeButton("Save Photo");
-        save.setOnClickListener(v -> savePhoto());
-        layout.addView(save);
-
-        Button back = makeButton("Back to Home");
-        back.setOnClickListener(v -> showHome());
-        layout.addView(back);
+        layout.addView(makeButton("Save Photo", this::savePhoto));
 
         scroll.addView(layout);
         setContentView(scroll);
-
-        if (currentBitmap != null) {
-            photoPreview.setImageBitmap(currentBitmap);
-        }
     }
 
     private void addFilterButton(
             LinearLayout layout, String label, String filter) {
-
-        Button button = makeButton(label);
-        button.setOnClickListener(v -> applyFilter(filter));
-        layout.addView(button);
+        layout.addView(makeButton(label, () -> applyFilter(filter)));
     }
 
     private void openGallery() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.setType("image/*");
-
-        try {
-            startActivityForResult(
-                    Intent.createChooser(intent, "Choose a photo"),
-                    REQUEST_GALLERY);
-        } catch (Exception e) {
-            Toast.makeText(this, "Unable to open gallery",
-                    Toast.LENGTH_SHORT).show();
-        }
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(intent, REQUEST_GALLERY);
     }
 
     private void openCamera() {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-
         if (intent.resolveActivity(getPackageManager()) != null) {
             startActivityForResult(intent, REQUEST_CAMERA);
         } else {
-            Toast.makeText(this, "No camera app is available",
-                    Toast.LENGTH_SHORT).show();
+            toast("No camera app is available");
         }
     }
 
     @Override
     protected void onActivityResult(
             int requestCode, int resultCode, Intent data) {
-
         super.onActivityResult(requestCode, resultCode, data);
 
         if (resultCode != RESULT_OK || data == null) {
@@ -188,72 +195,39 @@ public class MainActivity extends Activity {
             Bitmap bitmap = null;
 
             if (requestCode == REQUEST_GALLERY) {
-                Uri imageUri = data.getData();
-
-                if (imageUri != null) {
-                    InputStream stream =
-                            getContentResolver().openInputStream(imageUri);
-
-                    if (stream != null) {
-                        bitmap = BitmapFactory.decodeStream(stream);
-                        stream.close();
+                Uri uri = data.getData();
+                if (uri != null) {
+                    try (InputStream input =
+                                 getContentResolver().openInputStream(uri)) {
+                        bitmap = BitmapFactory.decodeStream(input);
                     }
                 }
             } else if (requestCode == REQUEST_CAMERA) {
-                Object result = data.getExtras() == null
+                Object extra = data.getExtras() == null
                         ? null : data.getExtras().get("data");
-
-                if (result instanceof Bitmap) {
-                    bitmap = (Bitmap) result;
+                if (extra instanceof Bitmap) {
+                    bitmap = (Bitmap) extra;
                 }
             }
 
             if (bitmap != null) {
-                originalBitmap = bitmap.copy(
-                        Bitmap.Config.ARGB_8888, false);
-                currentBitmap = originalBitmap;
-                showFaceScreen();
+                originalBitmap = bitmap;
+                currentBitmap = bitmap;
+                if (photoPreview != null) {
+                    photoPreview.setImageBitmap(bitmap);
+                }
+                toast("Photo loaded");
             } else {
-                Toast.makeText(this, "Could not load that photo",
-                        Toast.LENGTH_SHORT).show();
+                toast("Could not load the photo");
             }
         } catch (Exception e) {
-            Toast.makeText(this, "Unable to load photo",
-                    Toast.LENGTH_SHORT).show();
+            toast("Error loading photo");
         }
     }
 
     private void applyFilter(String filter) {
         if (originalBitmap == null) {
-            Toast.makeText(this, "Choose a photo first",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (filter.equals("original")) {
-            currentBitmap = originalBitmap;
-            photoPreview.setImageBitmap(currentBitmap);
-            return;
-        }
-
-        if (filter.equals("smooth")) {
-            int width = originalBitmap.getWidth();
-            int height = originalBitmap.getHeight();
-
-            Bitmap small = Bitmap.createScaledBitmap(
-                    originalBitmap,
-                    Math.max(1, width / 5),
-                    Math.max(1, height / 5),
-                    true);
-
-            currentBitmap = Bitmap.createScaledBitmap(
-                    small, width, height, true);
-
-            if (small != currentBitmap && small != originalBitmap) {
-                small.recycle();
-            }
-
-            photoPreview.setImageBitmap(currentBitmap);
+            toast("Choose a photo first");
             return;
         }
 
@@ -278,77 +252,94 @@ public class MainActivity extends Activity {
         Bitmap result = Bitmap.createBitmap(
                 width, height, Bitmap.Config.ARGB_8888);
 
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                int pixel = originalBitmap.getPixel(x, y);
-                int a = Color.alpha(pixel);
-                int r = Color.red(pixel);
-                int g = Color.green(pixel);
-                int b = Color.blue(pixel);
+        int[] pixels = new int[width * height];
+        originalBitmap.getPixels(pixels, 0, width, 0, 0, width, height);
 
-                if (filter.equals("bw")) {
-                    int gray = (int) (0.299 * r
-                            + 0.587 * g + 0.114 * b);
+        for (int i = 0; i < pixels.length; i++) {
+            int color = pixels[i];
+            int a = Color.alpha(color);
+            int r = Color.red(color);
+            int g = Color.green(color);
+            int b = Color.blue(color);
+
+            switch (filter) {
+                case "bw":
+                    int gray = (r + g + b) / 3;
                     r = g = b = gray;
+                    break;
 
-                } else if (filter.equals("sepia")) {
-                    int nr = (int) (0.393 * r
-                            + 0.769 * g + 0.189 * b);
-                    int ng = (int) (0.349 * r
-                            + 0.686 * g + 0.168 * b);
-                    int nb = (int) (0.272 * r
-                            + 0.534 * g + 0.131 * b);
+                case "sepia":
+                    int sr = (int) (0.393 * r + 0.769 * g + 0.189 * b);
+                    int sg = (int) (0.349 * r + 0.686 * g + 0.168 * b);
+                    int sb = (int) (0.272 * r + 0.534 * g + 0.131 * b);
+                    r = Math.min(255, sr);
+                    g = Math.min(255, sg);
+                    b = Math.min(255, sb);
+                    break;
 
-                    r = Math.min(255, nr);
-                    g = Math.min(255, ng);
-                    b = Math.min(255, nb);
+                case "brighten":
+                case "beautybright":
+                    r = Math.min(255, r + 30);
+                    g = Math.min(255, g + 30);
+                    b = Math.min(255, b + 30);
+                    break;
 
-                } else if (filter.equals("brighten")) {
-                    r = Math.min(255, r + 35);
-                    g = Math.min(255, g + 35);
-                    b = Math.min(255, b + 35);
+                case "vintage":
+                    r = Math.min(255, (int) (r * 1.08 + 12));
+                    g = Math.min(255, (int) (g * 0.94 + 6));
+                    b = (int) (b * 0.80);
+                    break;
 
-                } else if (filter.equals("vintage")) {
-                    r = Math.min(255, (int) (0.90 * r + 20));
-                    g = Math.min(255, (int) (0.80 * g + 15));
-                    b = Math.min(255, (int) (0.70 * b + 10));
+                case "smooth":
+                    int avg = (r + g + b) / 3;
+                    r = (r + avg) / 2;
+                    g = (g + avg) / 2;
+                    b = (b + avg) / 2;
+                    break;
 
-                } else if (filter.equals("beauty")) {
-                    r = Math.min(255, (int) (r * 1.10 + 12));
-                    g = Math.min(255, (int) (g * 1.10 + 12));
-                    b = Math.min(255, (int) (b * 1.10 + 12));
-                }
-
-                result.setPixel(x, y, Color.argb(a, r, g, b));
+                case "original":
+                default:
+                    break;
             }
+
+            pixels[i] = Color.argb(a, r, g, b);
         }
 
+        result.setPixels(pixels, 0, width, 0, 0, width, height);
         currentBitmap = result;
         photoPreview.setImageBitmap(currentBitmap);
     }
 
     private void applyFunnyEffect(String effect) {
         if (originalBitmap == null) {
+            toast("Choose a photo first");
             return;
         }
 
-        int width = originalBitmap.getWidth();
-        int height = originalBitmap.getHeight();
+        int originalWidth = originalBitmap.getWidth();
+        int originalHeight = originalBitmap.getHeight();
 
-        Bitmap result = Bitmap.createBitmap(
-                width, height, Bitmap.Config.ARGB_8888);
+        float scale = Math.min(1f, 900f /
+                Math.max(originalWidth, originalHeight));
+
+        int width = Math.max(1, Math.round(originalWidth * scale));
+        int height = Math.max(1, Math.round(originalHeight * scale));
+
+        Bitmap small = Bitmap.createScaledBitmap(
+                originalBitmap, width, height, true);
+
+        int[] input = new int[width * height];
+        int[] output = new int[width * height];
+        small.getPixels(input, 0, width, 0, 0, width, height);
 
         float minSide = Math.min(width, height);
-
         float headX = width * 0.50f;
         float headY = height * 0.43f;
         float headRadius = minSide * 0.43f;
-
         float leftEyeX = width * 0.38f;
         float rightEyeX = width * 0.62f;
         float eyeY = height * 0.39f;
         float eyeRadius = minSide * 0.15f;
-
         float mouthX = width * 0.50f;
         float mouthY = height * 0.63f;
         float mouthRadius = minSide * 0.13f;
@@ -358,36 +349,28 @@ public class MainActivity extends Activity {
                 float sx = x;
                 float sy = y;
 
-                if (effect.equals("bighead")
-                        || effect.equals("funny")) {
-                    float[] point = bulge(
-                            sx, sy, headX, headY,
-                            headRadius, 0.75f);
-                    sx = point[0];
-                    sy = point[1];
+                if (effect.equals("bighead") || effect.equals("funny")) {
+                    float[] p = bulge(
+                            sx, sy, headX, headY, headRadius, 0.75f);
+                    sx = p[0];
+                    sy = p[1];
                 }
 
-                if (effect.equals("bigeyes")
-                        || effect.equals("funny")) {
-                    float[] left = bulge(
-                            sx, sy, leftEyeX, eyeY,
+                if (effect.equals("bigeyes") || effect.equals("funny")) {
+                    float[] p1 = bulge(
+                            sx, sy, leftEyeX, eyeY, eyeRadius, 0.90f);
+                    float[] p2 = bulge(
+                            p1[0], p1[1], rightEyeX, eyeY,
                             eyeRadius, 0.90f);
-                    sx = left[0];
-                    sy = left[1];
-
-                    float[] right = bulge(
-                            sx, sy, rightEyeX, eyeY,
-                            eyeRadius, 0.90f);
-                    sx = right[0];
-                    sy = right[1];
+                    sx = p2[0];
+                    sy = p2[1];
                 }
 
                 if (effect.equals("funny")) {
-                    float[] mouth = bulge(
-                            sx, sy, mouthX, mouthY,
-                            mouthRadius, 0.65f);
-                    sx = mouth[0];
-                    sy = mouth[1];
+                    float[] p = bulge(
+                            sx, sy, mouthX, mouthY, mouthRadius, 0.65f);
+                    sx = p[0];
+                    sy = p[1];
                 }
 
                 int sourceX = Math.max(0,
@@ -395,124 +378,105 @@ public class MainActivity extends Activity {
                 int sourceY = Math.max(0,
                         Math.min(height - 1, Math.round(sy)));
 
-                result.setPixel(
-                        x, y, originalBitmap.getPixel(sourceX, sourceY));
+                output[y * width + x] =
+                        input[sourceY * width + sourceX];
             }
+        }
+
+        Bitmap result = Bitmap.createBitmap(
+                width, height, Bitmap.Config.ARGB_8888);
+        result.setPixels(output, 0, width, 0, 0, width, height);
+
+        if (small != originalBitmap && !small.isRecycled()) {
+            small.recycle();
         }
 
         currentBitmap = result;
         photoPreview.setImageBitmap(currentBitmap);
     }
 
-    // Additional face effects
     private void applyExtraFaceEffect(String effect) {
         if (originalBitmap == null) {
-            Toast.makeText(this, "Choose a photo first",
-                    Toast.LENGTH_SHORT).show();
+            toast("Choose a photo first");
             return;
         }
 
-        int originalWidth = originalBitmap.getWidth();
-        int originalHeight = originalBitmap.getHeight();
+        int ow = originalBitmap.getWidth();
+        int oh = originalBitmap.getHeight();
+        float scale = Math.min(1f, 900f / Math.max(ow, oh));
 
-        // Reduce processing size to help avoid memory problems.
-        int maxSide = 900;
-        float scale = Math.min(1f,
-                maxSide / (float) Math.max(
-                        originalWidth, originalHeight));
-
-        int w = Math.max(1, Math.round(originalWidth * scale));
-        int h = Math.max(1, Math.round(originalHeight * scale));
+        int width = Math.max(1, Math.round(ow * scale));
+        int height = Math.max(1, Math.round(oh * scale));
 
         Bitmap small = Bitmap.createScaledBitmap(
-                originalBitmap, w, h, true);
+                originalBitmap, width, height, true);
 
-        int[] input = new int[w * h];
-        int[] output = new int[w * h];
+        int[] input = new int[width * height];
+        int[] output = new int[width * height];
+        small.getPixels(input, 0, width, 0, 0, width, height);
 
-        small.getPixels(input, 0, w, 0, 0, w, h);
-
-        float minSide = Math.min(w, h);
-
-        float faceX = w * 0.50f;
-        float faceY = h * 0.43f;
+        float minSide = Math.min(width, height);
+        float faceX = width * 0.50f;
+        float faceY = height * 0.43f;
         float faceRadius = minSide * 0.24f;
-
-        float mouthX = w * 0.50f;
-        float mouthY = h * 0.63f;
+        float mouthX = width * 0.50f;
+        float mouthY = height * 0.63f;
         float mouthRadius = minSide * 0.075f;
-
-        float noseX = w * 0.50f;
-        float noseY = h * 0.49f;
+        float noseX = width * 0.50f;
+        float noseY = height * 0.49f;
         float noseRadius = minSide * 0.085f;
 
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
                 float sx = x;
                 float sy = y;
 
-                if (effect.equals("skinny")
-                        || effect.equals("wide")) {
+                if (effect.equals("skinny") || effect.equals("wide")) {
                     float dx = x - faceX;
                     float dy = y - faceY;
-
-                    float distance = (float) Math.sqrt(
-                            dx * dx + dy * dy);
+                    float distance = (float) Math.sqrt(dx * dx + dy * dy);
 
                     if (distance < faceRadius) {
                         float t = 1f - distance / faceRadius;
-
                         float strength = effect.equals("skinny")
                                 ? 0.28f : -0.28f;
-
-                        sx = faceX
-                                + dx * (1f + strength * t * t);
+                        sx = faceX + dx * (1f + strength * t * t);
                     }
-
                 } else if (effect.equals("tiny")) {
                     float dx = x - mouthX;
                     float dy = y - mouthY;
-
-                    float distance = (float) Math.sqrt(
-                            dx * dx + dy * dy);
+                    float distance = (float) Math.sqrt(dx * dx + dy * dy);
 
                     if (distance < mouthRadius) {
                         float t = 1f - distance / mouthRadius;
                         float factor = 1f + 0.65f * t * t;
-
                         sx = mouthX + dx * factor;
                         sy = mouthY + dy * factor;
                     }
-
                 } else if (effect.equals("nose")) {
                     float dx = x - noseX;
                     float dy = y - noseY;
-
-                    float distance = (float) Math.sqrt(
-                            dx * dx + dy * dy);
+                    float distance = (float) Math.sqrt(dx * dx + dy * dy);
 
                     if (distance < noseRadius) {
                         float t = 1f - distance / noseRadius;
-
-                        sy = noseY
-                                + dy * (1f + 0.90f * t * t);
+                        sy = noseY + dy * (1f + 0.90f * t * t);
                     }
                 }
 
                 int sourceX = Math.max(0,
-                        Math.min(w - 1, Math.round(sx)));
+                        Math.min(width - 1, Math.round(sx)));
                 int sourceY = Math.max(0,
-                        Math.min(h - 1, Math.round(sy)));
+                        Math.min(height - 1, Math.round(sy)));
 
-                output[y * w + x] =
-                        input[sourceY * w + sourceX];
+                output[y * width + x] =
+                        input[sourceY * width + sourceX];
             }
         }
 
         Bitmap result = Bitmap.createBitmap(
-                w, h, Bitmap.Config.ARGB_8888);
-
-        result.setPixels(output, 0, w, 0, 0, w, h);
+                width, height, Bitmap.Config.ARGB_8888);
+        result.setPixels(output, 0, width, 0, 0, width, height);
 
         if (small != originalBitmap && !small.isRecycled()) {
             small.recycle();
@@ -523,67 +487,435 @@ public class MainActivity extends Activity {
     }
 
     private float[] bulge(
-            float x, float y,
-            float centerX, float centerY,
+            float x, float y, float centerX, float centerY,
             float radius, float strength) {
 
         float dx = x - centerX;
         float dy = y - centerY;
-
-        float distance = (float) Math.sqrt(
-                dx * dx + dy * dy);
+        float distance = (float) Math.sqrt(dx * dx + dy * dy);
 
         if (distance >= radius || radius <= 0) {
             return new float[]{x, y};
         }
 
-        float amount = 1.0f - distance / radius;
-        float scale = 1.0f + strength * amount * amount;
+        float amount = 1f - distance / radius;
+        float scale = 1f + strength * amount * amount;
 
-        float sourceX = centerX + dx / scale;
-        float sourceY = centerY + dy / scale;
-
-        return new float[]{sourceX, sourceY};
+        return new float[]{
+                centerX + dx / scale,
+                centerY + dy / scale
+        };
     }
 
     private void savePhoto() {
         if (currentBitmap == null) {
-            Toast.makeText(this, "Choose a photo first",
-                    Toast.LENGTH_SHORT).show();
+            toast("Choose a photo first");
             return;
         }
 
         try {
             String saved = MediaStore.Images.Media.insertImage(
-                    getContentResolver(),
-                    currentBitmap,
+                    getContentResolver(), currentBitmap,
                     "FaceVoice_" + System.currentTimeMillis(),
-                    "Edited with Face Voice Studio");
+                    "Edited with Face & Voice Studio");
 
-            if (saved != null) {
-                Toast.makeText(this, "Photo saved to your gallery!",
-                        Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(this, "Could not save photo",
-                        Toast.LENGTH_LONG).show();
-            }
+            toast(saved != null
+                    ? "Photo saved to your gallery"
+                    : "Could not save photo");
         } catch (Exception e) {
-            Toast.makeText(this, "Could not save photo",
-                    Toast.LENGTH_LONG).show();
+            toast("Could not save photo");
         }
     }
 
     private void showVoiceScreen() {
+        ScrollView scroll = new ScrollView(this);
         LinearLayout layout = createLayout();
 
-        layout.addView(makeText("Voice Effects", 26));
+        layout.addView(makeButton("← Back to Home", this::showHome));
+        layout.addView(makeText("VOICE STUDIO", 24));
         layout.addView(makeText(
-                "Voice recording and effects will be added next.", 17));
+                "Record your voice, change playback, or speak text", 15));
 
-        Button back = makeButton("Back to Home");
-        back.setOnClickListener(v -> showHome());
+        recordingStatus = makeText("Status: Ready", 16);
+        layout.addView(recordingStatus);
 
-        layout.addView(back);
-        setContentView(layout);
+        layout.addView(makeButton("Start Recording", this::startRecording));
+        layout.addView(makeButton("Stop Recording", this::stopRecording));
+        layout.addView(makeButton("Play Recording", this::playRecording));
+
+        layout.addView(makeText("Recording Playback Effects", 18));
+        layout.addView(makeButton("Normal Voice",
+                () -> playWithEffect("Normal")));
+        layout.addView(makeButton("Deep Voice",
+                () -> playWithEffect("Deep Voice")));
+        layout.addView(makeButton("High Voice",
+                () -> playWithEffect("High Voice")));
+        layout.addView(makeButton("Robot Style",
+                () -> playWithEffect("Robot Style")));
+        layout.addView(makeButton("Funny / Fast Voice",
+                () -> playWithEffect("Fast Voice")));
+        layout.addView(makeButton("Slow Voice",
+                () -> playWithEffect("Slow Voice")));
+        layout.addView(makeButton("Stop Playback", this::stopPlayback));
+
+        layout.addView(makeText("Text-to-Speech Voice Generator", 20));
+
+        speechInput = new EditText(this);
+        speechInput.setTextColor(Color.WHITE);
+        speechInput.setHintTextColor(Color.LTGRAY);
+        speechInput.setHint("Type something for the voice to speak");
+        speechInput.setMinLines(3);
+        speechInput.setGravity(Gravity.TOP);
+        layout.addView(speechInput);
+
+        selectedVoiceLabel = makeText("Voice: Default phone voice", 14);
+        layout.addView(selectedVoiceLabel);
+
+        layout.addView(makeButton("Choose Installed Voice",
+                this::chooseInstalledVoice));
+        layout.addView(makeButton("Speak Text", this::speakText));
+        layout.addView(makeButton("Stop Speaking", () -> {
+            if (textToSpeech != null) {
+                textToSpeech.stop();
+            }
+        }));
+
+        layout.addView(makeText(
+                "Available accents and languages depend on the voices installed "
+                        + "on your Android phone. Online AI voices need a separate "
+                        + "service and are not included in this version.", 13));
+
+        scroll.addView(layout);
+        setContentView(scroll);
+    }
+
+    private void startRecording() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{Manifest.permission.RECORD_AUDIO},
+                    REQUEST_MICROPHONE);
+            return;
+        }
+
+        if (isRecording) {
+            toast("Recording is already in progress");
+            return;
+        }
+
+        try {
+            File directory = getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+            if (directory == null) {
+                toast("Recording storage is unavailable");
+                return;
+            }
+
+            if (!directory.exists()) {
+                directory.mkdirs();
+            }
+
+            recordingFile = new File(directory,
+                    "voice_" + System.currentTimeMillis() + ".m4a");
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                recorder = new MediaRecorder(this);
+            } else {
+                recorder = new MediaRecorder();
+            }
+
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            recorder.setAudioSamplingRate(44100);
+            recorder.setAudioEncodingBitRate(128000);
+            recorder.setOutputFile(recordingFile.getAbsolutePath());
+            recorder.prepare();
+            recorder.start();
+
+            isRecording = true;
+            updateRecordingStatus("Recording...");
+            toast("Recording started");
+        } catch (Exception e) {
+            releaseRecorder();
+            isRecording = false;
+            updateRecordingStatus("Could not start recording");
+            toast("Recording failed. Check microphone permission.");
+        }
+    }
+
+    private void stopRecording() {
+        if (!isRecording || recorder == null) {
+            toast("There is no active recording");
+            return;
+        }
+
+        try {
+            recorder.stop();
+            updateRecordingStatus("Saved: " + recordingFile.getName());
+            toast("Recording saved inside the app");
+        } catch (Exception e) {
+            toast("Recording was too short or could not be saved");
+        } finally {
+            releaseRecorder();
+            isRecording = false;
+        }
+    }
+
+    private void playRecording() {
+        playWithEffect("Normal");
+    }
+
+    private void playWithEffect(String effect) {
+        if (recordingFile == null || !recordingFile.exists()) {
+            toast("Record your voice first");
+            return;
+        }
+
+        if (isRecording) {
+            toast("Stop recording before playback");
+            return;
+        }
+
+        stopPlayback();
+
+        try {
+            player = new MediaPlayer();
+            player.setDataSource(recordingFile.getAbsolutePath());
+
+            player.setOnPreparedListener(mp -> {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        PlaybackParams params = new PlaybackParams();
+                        params.setSpeed(1f);
+                        params.setPitch(1f);
+
+                        switch (effect) {
+                            case "Deep Voice":
+                                params.setPitch(0.75f);
+                                break;
+                            case "High Voice":
+                                params.setPitch(1.30f);
+                                break;
+                            case "Robot Style":
+                                params.setPitch(0.70f);
+                                break;
+                            case "Fast Voice":
+                                params.setSpeed(1.35f);
+                                params.setPitch(1.10f);
+                                break;
+                            case "Slow Voice":
+                                params.setSpeed(0.75f);
+                                break;
+                            default:
+                                break;
+                        }
+
+                        mp.setPlaybackParams(params);
+                    } else if (!effect.equals("Normal")) {
+                        toast("Voice speed and pitch effects require Android 6 or newer");
+                    }
+
+                    mp.start();
+                    updateRecordingStatus("Playing: " + effect);
+                } catch (Exception e) {
+                    toast("Could not apply this playback effect");
+                    stopPlayback();
+                }
+            });
+
+            player.setOnCompletionListener(mp -> {
+                updateRecordingStatus("Playback finished");
+                stopPlayback();
+            });
+
+            player.setOnErrorListener((mp, what, extra) -> {
+                toast("Playback failed");
+                stopPlayback();
+                return true;
+            });
+
+            player.prepareAsync();
+        } catch (Exception e) {
+            stopPlayback();
+            toast("Could not play the recording");
+        }
+    }
+
+    private void stopPlayback() {
+        if (player != null) {
+            try {
+                if (player.isPlaying()) {
+                    player.stop();
+                }
+            } catch (Exception ignored) {
+            }
+
+            try {
+                player.reset();
+                player.release();
+            } catch (Exception ignored) {
+            }
+
+            player = null;
+        }
+    }
+
+    private void chooseInstalledVoice() {
+        if (!ttsReady || textToSpeech == null) {
+            toast("Text-to-speech is still starting");
+            return;
+        }
+
+        try {
+            List<Voice> voices = new ArrayList<>(
+                    textToSpeech.getVoices());
+
+            if (voices.isEmpty()) {
+                toast("No installed voices were found");
+                return;
+            }
+
+            List<Voice> usableVoices = new ArrayList<>();
+            List<String> labels = new ArrayList<>();
+
+            for (Voice voice : voices) {
+                if (voice == null) {
+                    continue;
+                }
+
+                usableVoices.add(voice);
+
+                Locale locale = voice.getLocale();
+                String language = locale == null
+                        ? "Unknown language"
+                        : locale.getDisplayName();
+
+                String quality = voice.getQuality() >= Voice.QUALITY_HIGH
+                        ? "High quality" : "Standard quality";
+
+                labels.add(language + " — " + voice.getName()
+                        + " (" + quality + ")");
+            }
+
+            String[] options = labels.toArray(new String[0]);
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Choose an Installed Voice")
+                    .setItems(options, (dialog, which) -> {
+                        Voice voice = usableVoices.get(which);
+                        int result = textToSpeech.setVoice(voice);
+
+                        if (result == TextToSpeech.SUCCESS) {
+                            selectedVoice = voice;
+                            if (selectedVoiceLabel != null) {
+                                selectedVoiceLabel.setText(
+                                        "Voice: " + voice.getName()
+                                                + " — "
+                                                + voice.getLocale()
+                                                        .getDisplayName());
+                            }
+                            toast("Voice selected");
+                        } else {
+                            toast("Could not select that voice");
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+
+        } catch (Exception e) {
+            toast("Could not load installed voices");
+        }
+    }
+
+    private void speakText() {
+        if (!ttsReady || textToSpeech == null) {
+            toast("Text-to-speech is not ready yet");
+            return;
+        }
+
+        if (speechInput == null) {
+            return;
+        }
+
+        String text = speechInput.getText().toString().trim();
+
+        if (text.isEmpty()) {
+            toast("Type some text first");
+            return;
+        }
+
+        try {
+            textToSpeech.speak(
+                    text,
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "face_voice_speech");
+        } catch (Exception e) {
+            toast("Could not speak the text");
+        }
+    }
+
+    private void updateRecordingStatus(String text) {
+        if (recordingStatus != null) {
+            recordingStatus.setText("Status: " + text);
+        }
+    }
+
+    private void releaseRecorder() {
+        if (recorder != null) {
+            try {
+                recorder.reset();
+            } catch (Exception ignored) {
+            }
+
+            try {
+                recorder.release();
+            } catch (Exception ignored) {
+            }
+
+            recorder = null;
+        }
+    }
+
+    private void toast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(
+                requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_MICROPHONE) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startRecording();
+            } else {
+                toast("Microphone permission is needed to record");
+            }
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (isRecording && recorder != null) {
+            try {
+                recorder.stop();
+            } catch (Exception ignored) {
+            }
+        }
+
+        isRecording = false;
+        releaseRecorder();
+        stopPlayback();
+
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+            textToSpeech = null;
+        }
+
+        super.onDestroy();
     }
 }
