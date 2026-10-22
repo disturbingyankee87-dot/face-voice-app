@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "551413358868",
+    "project_id": "face-voice-studio",
+    "storage_bucket": "face-voice-studio.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:551413358868:android:e91f76f1aea3a32e6ee201",
+        "android_client_info": {
+          "package_name": "com.facevoice.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArHwSozLSVqYIh9c4hiMDbq18csrjapB8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
