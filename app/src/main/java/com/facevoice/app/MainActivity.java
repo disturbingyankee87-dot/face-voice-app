@@ -47,7 +47,6 @@ public class MainActivity extends Activity {
     private MediaPlayer player;
     private File recordingFile;
     private boolean isRecording = false;
-    private String selectedEffect = "Normal";
 
     private TextToSpeech textToSpeech;
     private boolean ttsReady = false;
@@ -56,6 +55,11 @@ public class MainActivity extends Activity {
     private TextView recordingStatus;
     private EditText speechInput;
     private TextView selectedVoiceLabel;
+
+    private String selectedTtsStyle = "Default";
+
+    private float ttsPitch = 1.0f;
+    private float ttsRate = 1.0f;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,7 +70,15 @@ public class MainActivity extends Activity {
         textToSpeech = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
                 ttsReady = true;
-                textToSpeech.setLanguage(Locale.getDefault());
+
+                int result = textToSpeech.setLanguage(Locale.getDefault());
+
+                if (result == TextToSpeech.LANG_MISSING_DATA
+                        || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    textToSpeech.setLanguage(Locale.US);
+                }
+
+                applyTtsSettings();
             } else {
                 toast("Text-to-speech is unavailable on this device");
             }
@@ -558,7 +570,7 @@ public class MainActivity extends Activity {
                 () -> playWithEffect("Slow Voice")));
         layout.addView(makeButton("Stop Playback", this::stopPlayback));
 
-        layout.addView(makeText("Text-to-Speech Voice Generator", 20));
+        layout.addView(makeText("TEXT-TO-SPEECH VOICE GENERATOR", 20));
 
         speechInput = new EditText(this);
         speechInput.setTextColor(Color.WHITE);
@@ -568,11 +580,40 @@ public class MainActivity extends Activity {
         speechInput.setGravity(Gravity.TOP);
         layout.addView(speechInput);
 
-        selectedVoiceLabel = makeText("Voice: Default phone voice", 14);
+        selectedVoiceLabel = makeText(
+                "Selected style: " + selectedTtsStyle, 15);
         layout.addView(selectedVoiceLabel);
 
-        layout.addView(makeButton("Choose Installed Voice",
+        layout.addView(makeText("Choose a Voice Style", 18));
+        layout.addView(makeButton("Default Voice",
+                () -> chooseTtsStyle("Default")));
+        layout.addView(makeButton("Male Voice Style",
+                () -> chooseTtsStyle("Male")));
+        layout.addView(makeButton("Female Voice Style",
+                () -> chooseTtsStyle("Female")));
+        layout.addView(makeButton("Young Adult Voice",
+                () -> chooseTtsStyle("Young Adult")));
+        layout.addView(makeButton("Older Man Voice",
+                () -> chooseTtsStyle("Older Man")));
+        layout.addView(makeButton("Older Woman Voice",
+                () -> chooseTtsStyle("Older Woman")));
+        layout.addView(makeButton("Child Voice",
+                () -> chooseTtsStyle("Child")));
+        layout.addView(makeButton("Baby Voice",
+                () -> chooseTtsStyle("Baby")));
+        layout.addView(makeButton("Narrator Voice",
+                () -> chooseTtsStyle("Narrator")));
+        layout.addView(makeButton("Robot Voice",
+                () -> chooseTtsStyle("Robot")));
+        layout.addView(makeButton("Fast Voice",
+                () -> chooseTtsStyle("Fast")));
+        layout.addView(makeButton("Slow Voice",
+                () -> chooseTtsStyle("Slow")));
+
+        layout.addView(makeText("More Natural Voices", 18));
+        layout.addView(makeButton("Choose Installed Phone Voice",
                 this::chooseInstalledVoice));
+
         layout.addView(makeButton("Speak Text", this::speakText));
         layout.addView(makeButton("Stop Speaking", () -> {
             if (textToSpeech != null) {
@@ -581,12 +622,106 @@ public class MainActivity extends Activity {
         }));
 
         layout.addView(makeText(
-                "Available accents and languages depend on the voices installed "
-                        + "on your Android phone. Online AI voices need a separate "
-                        + "service and are not included in this version.", 13));
+                "Voice styles adjust pitch and speed. The actual sound "
+                        + "depends on your phone's speech engine. For more "
+                        + "natural male, female, child or accent voices, install "
+                        + "additional voices in your phone's Text-to-speech "
+                        + "settings and select them above. Online AI voices "
+                        + "require a separate service and are not connected yet.",
+                13));
 
         scroll.addView(layout);
         setContentView(scroll);
+    }
+
+    private void chooseTtsStyle(String style) {
+        selectedTtsStyle = style;
+
+        switch (style) {
+            case "Male":
+                ttsPitch = 0.82f;
+                ttsRate = 0.96f;
+                break;
+
+            case "Female":
+                ttsPitch = 1.22f;
+                ttsRate = 1.00f;
+                break;
+
+            case "Young Adult":
+                ttsPitch = 1.12f;
+                ttsRate = 1.05f;
+                break;
+
+            case "Older Man":
+                ttsPitch = 0.72f;
+                ttsRate = 0.82f;
+                break;
+
+            case "Older Woman":
+                ttsPitch = 1.08f;
+                ttsRate = 0.82f;
+                break;
+
+            case "Child":
+                ttsPitch = 1.42f;
+                ttsRate = 0.94f;
+                break;
+
+            case "Baby":
+                ttsPitch = 1.75f;
+                ttsRate = 0.78f;
+                break;
+
+            case "Narrator":
+                ttsPitch = 0.94f;
+                ttsRate = 0.90f;
+                break;
+
+            case "Robot":
+                ttsPitch = 0.70f;
+                ttsRate = 1.00f;
+                break;
+
+            case "Fast":
+                ttsPitch = 1.00f;
+                ttsRate = 1.35f;
+                break;
+
+            case "Slow":
+                ttsPitch = 1.00f;
+                ttsRate = 0.72f;
+                break;
+
+            case "Default":
+            default:
+                ttsPitch = 1.00f;
+                ttsRate = 1.00f;
+                break;
+        }
+
+        applyTtsSettings();
+
+        if (selectedVoiceLabel != null) {
+            String voiceName = selectedVoice == null
+                    ? "Phone default voice"
+                    : selectedVoice.getName();
+
+            selectedVoiceLabel.setText(
+                    "Selected style: " + selectedTtsStyle
+                            + "\nInstalled voice: " + voiceName);
+        }
+
+        toast(style + " voice style selected");
+    }
+
+    private void applyTtsSettings() {
+        if (!ttsReady || textToSpeech == null) {
+            return;
+        }
+
+        textToSpeech.setPitch(ttsPitch);
+        textToSpeech.setSpeechRate(ttsRate);
     }
 
     private void startRecording() {
@@ -693,26 +828,31 @@ public class MainActivity extends Activity {
                             case "Deep Voice":
                                 params.setPitch(0.75f);
                                 break;
+
                             case "High Voice":
                                 params.setPitch(1.30f);
                                 break;
+
                             case "Robot Style":
                                 params.setPitch(0.70f);
                                 break;
+
                             case "Fast Voice":
                                 params.setSpeed(1.35f);
                                 params.setPitch(1.10f);
                                 break;
+
                             case "Slow Voice":
                                 params.setSpeed(0.75f);
                                 break;
+
                             default:
                                 break;
                         }
 
                         mp.setPlaybackParams(params);
                     } else if (!effect.equals("Normal")) {
-                        toast("Voice speed and pitch effects require Android 6 or newer");
+                        toast("Playback effects require Android 6 or newer");
                     }
 
                     mp.start();
@@ -807,14 +947,19 @@ public class MainActivity extends Activity {
 
                         if (result == TextToSpeech.SUCCESS) {
                             selectedVoice = voice;
+
                             if (selectedVoiceLabel != null) {
                                 selectedVoiceLabel.setText(
-                                        "Voice: " + voice.getName()
+                                        "Selected style: " + selectedTtsStyle
+                                                + "\nInstalled voice: "
+                                                + voice.getName()
                                                 + " — "
                                                 + voice.getLocale()
                                                         .getDisplayName());
                             }
-                            toast("Voice selected");
+
+                            applyTtsSettings();
+                            toast("Installed voice selected");
                         } else {
                             toast("Could not select that voice");
                         }
@@ -845,6 +990,8 @@ public class MainActivity extends Activity {
         }
 
         try {
+            applyTtsSettings();
+
             textToSpeech.speak(
                     text,
                     TextToSpeech.QUEUE_FLUSH,
