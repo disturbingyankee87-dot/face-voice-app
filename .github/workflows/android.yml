@@ -22,20 +22,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-
-      
-      - name: Check Android SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls -la "$ANDROID_HOME"
-          find "$ANDROID_HOME" -name sdkmanager -type f 2>/dev/null | head -10
-
-
-      - name: Install Android SDK packages
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
+  
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools,platforms;android-35,build-tools;35.0.0"
+       
       - name: Allow Gradle wrapper to run
         run: chmod +x gradlew
 
