@@ -23,11 +23,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      
       - name: Check Android SDK
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
-          which sdkmanager
-          sdkmanager --version
+          ls -la "$ANDROID_HOME"
+          find "$ANDROID_HOME" -name sdkmanager -type f 2>/dev/null | head -10
+
 
       - name: Install Android SDK packages
         run: |
