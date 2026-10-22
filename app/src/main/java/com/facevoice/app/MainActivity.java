@@ -81,7 +81,7 @@ public class MainActivity extends Activity {
 
         layout.addView(makeText("Face Effects Studio", 25));
         layout.addView(makeText(
-            "Choose a photo, then apply a filter.", 16));
+            "Choose a photo, then apply an effect.", 16));
 
         Button gallery = makeButton("Choose from Gallery");
         Button camera = makeButton("Take a Photo");
@@ -97,17 +97,23 @@ public class MainActivity extends Activity {
 
         layout.addView(gallery);
         layout.addView(camera);
+
         layout.addView(photoPreview,
             new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 400));
 
-        layout.addView(makeText("PHOTO FILTERS", 20));
+        layout.addView(makeText("BASIC FILTERS", 20));
 
         addFilterButton(layout, "Original", "original");
         addFilterButton(layout, "Black & White", "bw");
         addFilterButton(layout, "Sepia", "sepia");
         addFilterButton(layout, "Brighten", "brighten");
         addFilterButton(layout, "Vintage", "vintage");
+
+        layout.addView(makeText("BEAUTY FILTERS", 20));
+
+        addFilterButton(layout, "Beauty Smooth", "smooth");
+        addFilterButton(layout, "Beauty Brighten", "beauty");
 
         Button save = makeButton("Save Photo");
         save.setOnClickListener(v -> savePhoto());
@@ -120,7 +126,7 @@ public class MainActivity extends Activity {
         scroll.addView(layout);
         setContentView(scroll);
 
-        if (originalBitmap != null) {
+        if (currentBitmap != null) {
             photoPreview.setImageBitmap(currentBitmap);
         }
     }
@@ -222,6 +228,23 @@ public class MainActivity extends Activity {
             return;
         }
 
+        if (filter.equals("smooth")) {
+            int width = originalBitmap.getWidth();
+            int height = originalBitmap.getHeight();
+
+            int smallWidth = Math.max(1, width / 5);
+            int smallHeight = Math.max(1, height / 5);
+
+            Bitmap small = Bitmap.createScaledBitmap(
+                originalBitmap, smallWidth, smallHeight, true);
+
+            currentBitmap = Bitmap.createScaledBitmap(
+                small, width, height, true);
+
+            photoPreview.setImageBitmap(currentBitmap);
+            return;
+        }
+
         int width = originalBitmap.getWidth();
         int height = originalBitmap.getHeight();
 
@@ -260,13 +283,14 @@ public class MainActivity extends Activity {
                     b = Math.min(255, b + 35);
 
                 } else if (filter.equals("vintage")) {
-                    int nr = (int) (0.90 * r + 20);
-                    int ng = (int) (0.80 * g + 15);
-                    int nb = (int) (0.70 * b + 10);
+                    r = Math.min(255, (int) (0.90 * r + 20));
+                    g = Math.min(255, (int) (0.80 * g + 15));
+                    b = Math.min(255, (int) (0.70 * b + 10));
 
-                    r = Math.min(255, nr);
-                    g = Math.min(255, ng);
-                    b = Math.min(255, nb);
+                } else if (filter.equals("beauty")) {
+                    r = Math.min(255, (int) (r * 1.10 + 12));
+                    g = Math.min(255, (int) (g * 1.10 + 12));
+                    b = Math.min(255, (int) (b * 1.10 + 12));
                 }
 
                 result.setPixel(x, y, Color.argb(a, r, g, b));
