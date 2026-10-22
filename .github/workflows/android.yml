@@ -23,17 +23,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-            - name: Install Android SDK
+      - name: Install Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
 
       - name: Install Android packages
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-35"
           sdkmanager "build-tools;35.0.0"
-
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
 
       - name: Allow Gradle wrapper to run
         run: chmod +x gradlew
