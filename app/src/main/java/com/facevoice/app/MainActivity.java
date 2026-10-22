@@ -15,6 +15,7 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 import android.widget.ScrollView;
+
 import java.io.InputStream;
 
 public class MainActivity extends Activity {
@@ -81,7 +82,7 @@ public class MainActivity extends Activity {
 
         layout.addView(makeText("Face Effects Studio", 25));
         layout.addView(makeText(
-            "Choose a photo, then apply an effect.", 16));
+                "Choose a photo, then apply an effect.", 16));
 
         Button gallery = makeButton("Choose from Gallery");
         Button camera = makeButton("Take a Photo");
@@ -98,11 +99,10 @@ public class MainActivity extends Activity {
         layout.addView(gallery);
         layout.addView(camera);
         layout.addView(photoPreview,
-            new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 400));
+                new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, 400));
 
         layout.addView(makeText("BASIC FILTERS", 20));
-
         addFilterButton(layout, "Original", "original");
         addFilterButton(layout, "Black & White", "bw");
         addFilterButton(layout, "Sepia", "sepia");
@@ -110,15 +110,20 @@ public class MainActivity extends Activity {
         addFilterButton(layout, "Vintage", "vintage");
 
         layout.addView(makeText("BEAUTY FILTERS", 20));
-
         addFilterButton(layout, "Beauty Smooth", "smooth");
         addFilterButton(layout, "Beauty Brighten", "beauty");
 
         layout.addView(makeText("FUNNY FACE EFFECTS", 20));
-
         addFilterButton(layout, "Big Head", "bighead");
         addFilterButton(layout, "Big Eyes", "bigeyes");
         addFilterButton(layout, "Funny Face", "funny");
+
+        // New face effects
+        layout.addView(makeText("MORE FACE EFFECTS", 20));
+        addFilterButton(layout, "Skinny Face", "skinny");
+        addFilterButton(layout, "Wide Face", "wide");
+        addFilterButton(layout, "Tiny Mouth", "tiny");
+        addFilterButton(layout, "Long Nose", "nose");
 
         Button save = makeButton("Save Photo");
         save.setOnClickListener(v -> savePhoto());
@@ -137,7 +142,7 @@ public class MainActivity extends Activity {
     }
 
     private void addFilterButton(
-        LinearLayout layout, String label, String filter) {
+            LinearLayout layout, String label, String filter) {
 
         Button button = makeButton(label);
         button.setOnClickListener(v -> applyFilter(filter));
@@ -150,29 +155,28 @@ public class MainActivity extends Activity {
 
         try {
             startActivityForResult(
-                Intent.createChooser(intent, "Choose a photo"),
-                REQUEST_GALLERY);
+                    Intent.createChooser(intent, "Choose a photo"),
+                    REQUEST_GALLERY);
         } catch (Exception e) {
             Toast.makeText(this, "Unable to open gallery",
-                Toast.LENGTH_SHORT).show();
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
     private void openCamera() {
-        Intent intent = new Intent(
-            MediaStore.ACTION_IMAGE_CAPTURE);
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
 
         if (intent.resolveActivity(getPackageManager()) != null) {
             startActivityForResult(intent, REQUEST_CAMERA);
         } else {
             Toast.makeText(this, "No camera app is available",
-                Toast.LENGTH_SHORT).show();
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
     @Override
     protected void onActivityResult(
-        int requestCode, int resultCode, Intent data) {
+            int requestCode, int resultCode, Intent data) {
 
         super.onActivityResult(requestCode, resultCode, data);
 
@@ -188,7 +192,7 @@ public class MainActivity extends Activity {
 
                 if (imageUri != null) {
                     InputStream stream =
-                        getContentResolver().openInputStream(imageUri);
+                            getContentResolver().openInputStream(imageUri);
 
                     if (stream != null) {
                         bitmap = BitmapFactory.decodeStream(stream);
@@ -197,7 +201,7 @@ public class MainActivity extends Activity {
                 }
             } else if (requestCode == REQUEST_CAMERA) {
                 Object result = data.getExtras() == null
-                    ? null : data.getExtras().get("data");
+                        ? null : data.getExtras().get("data");
 
                 if (result instanceof Bitmap) {
                     bitmap = (Bitmap) result;
@@ -206,24 +210,23 @@ public class MainActivity extends Activity {
 
             if (bitmap != null) {
                 originalBitmap = bitmap.copy(
-                    Bitmap.Config.ARGB_8888, false);
+                        Bitmap.Config.ARGB_8888, false);
                 currentBitmap = originalBitmap;
                 showFaceScreen();
             } else {
                 Toast.makeText(this, "Could not load that photo",
-                    Toast.LENGTH_SHORT).show();
+                        Toast.LENGTH_SHORT).show();
             }
-
         } catch (Exception e) {
             Toast.makeText(this, "Unable to load photo",
-                Toast.LENGTH_SHORT).show();
+                    Toast.LENGTH_SHORT).show();
         }
     }
 
     private void applyFilter(String filter) {
         if (originalBitmap == null) {
             Toast.makeText(this, "Choose a photo first",
-                Toast.LENGTH_SHORT).show();
+                    Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -238,15 +241,15 @@ public class MainActivity extends Activity {
             int height = originalBitmap.getHeight();
 
             Bitmap small = Bitmap.createScaledBitmap(
-                originalBitmap,
-                Math.max(1, width / 5),
-                Math.max(1, height / 5),
-                true);
+                    originalBitmap,
+                    Math.max(1, width / 5),
+                    Math.max(1, height / 5),
+                    true);
 
             currentBitmap = Bitmap.createScaledBitmap(
-                small, width, height, true);
+                    small, width, height, true);
 
-            if (small != currentBitmap) {
+            if (small != currentBitmap && small != originalBitmap) {
                 small.recycle();
             }
 
@@ -261,16 +264,23 @@ public class MainActivity extends Activity {
             return;
         }
 
+        if (filter.equals("skinny")
+                || filter.equals("wide")
+                || filter.equals("tiny")
+                || filter.equals("nose")) {
+            applyExtraFaceEffect(filter);
+            return;
+        }
+
         int width = originalBitmap.getWidth();
         int height = originalBitmap.getHeight();
 
         Bitmap result = Bitmap.createBitmap(
-            width, height, Bitmap.Config.ARGB_8888);
+                width, height, Bitmap.Config.ARGB_8888);
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int pixel = originalBitmap.getPixel(x, y);
-
                 int a = Color.alpha(pixel);
                 int r = Color.red(pixel);
                 int g = Color.green(pixel);
@@ -278,16 +288,16 @@ public class MainActivity extends Activity {
 
                 if (filter.equals("bw")) {
                     int gray = (int) (0.299 * r
-                        + 0.587 * g + 0.114 * b);
+                            + 0.587 * g + 0.114 * b);
                     r = g = b = gray;
 
                 } else if (filter.equals("sepia")) {
                     int nr = (int) (0.393 * r
-                        + 0.769 * g + 0.189 * b);
+                            + 0.769 * g + 0.189 * b);
                     int ng = (int) (0.349 * r
-                        + 0.686 * g + 0.168 * b);
+                            + 0.686 * g + 0.168 * b);
                     int nb = (int) (0.272 * r
-                        + 0.534 * g + 0.131 * b);
+                            + 0.534 * g + 0.131 * b);
 
                     r = Math.min(255, nr);
                     g = Math.min(255, ng);
@@ -318,11 +328,15 @@ public class MainActivity extends Activity {
     }
 
     private void applyFunnyEffect(String effect) {
+        if (originalBitmap == null) {
+            return;
+        }
+
         int width = originalBitmap.getWidth();
         int height = originalBitmap.getHeight();
 
         Bitmap result = Bitmap.createBitmap(
-            width, height, Bitmap.Config.ARGB_8888);
+                width, height, Bitmap.Config.ARGB_8888);
 
         float minSide = Math.min(width, height);
 
@@ -347,8 +361,8 @@ public class MainActivity extends Activity {
                 if (effect.equals("bighead")
                         || effect.equals("funny")) {
                     float[] point = bulge(
-                        sx, sy, headX, headY,
-                        headRadius, 0.75f);
+                            sx, sy, headX, headY,
+                            headRadius, 0.75f);
                     sx = point[0];
                     sy = point[1];
                 }
@@ -356,33 +370,33 @@ public class MainActivity extends Activity {
                 if (effect.equals("bigeyes")
                         || effect.equals("funny")) {
                     float[] left = bulge(
-                        sx, sy, leftEyeX, eyeY,
-                        eyeRadius, 0.90f);
+                            sx, sy, leftEyeX, eyeY,
+                            eyeRadius, 0.90f);
                     sx = left[0];
                     sy = left[1];
 
                     float[] right = bulge(
-                        sx, sy, rightEyeX, eyeY,
-                        eyeRadius, 0.90f);
+                            sx, sy, rightEyeX, eyeY,
+                            eyeRadius, 0.90f);
                     sx = right[0];
                     sy = right[1];
                 }
 
                 if (effect.equals("funny")) {
                     float[] mouth = bulge(
-                        sx, sy, mouthX, mouthY,
-                        mouthRadius, 0.65f);
+                            sx, sy, mouthX, mouthY,
+                            mouthRadius, 0.65f);
                     sx = mouth[0];
                     sy = mouth[1];
                 }
 
                 int sourceX = Math.max(0,
-                    Math.min(width - 1, Math.round(sx)));
+                        Math.min(width - 1, Math.round(sx)));
                 int sourceY = Math.max(0,
-                    Math.min(height - 1, Math.round(sy)));
+                        Math.min(height - 1, Math.round(sy)));
 
                 result.setPixel(
-                    x, y, originalBitmap.getPixel(sourceX, sourceY));
+                        x, y, originalBitmap.getPixel(sourceX, sourceY));
             }
         }
 
@@ -390,17 +404,137 @@ public class MainActivity extends Activity {
         photoPreview.setImageBitmap(currentBitmap);
     }
 
+    // Additional face effects
+    private void applyExtraFaceEffect(String effect) {
+        if (originalBitmap == null) {
+            Toast.makeText(this, "Choose a photo first",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int originalWidth = originalBitmap.getWidth();
+        int originalHeight = originalBitmap.getHeight();
+
+        // Reduce processing size to help avoid memory problems.
+        int maxSide = 900;
+        float scale = Math.min(1f,
+                maxSide / (float) Math.max(
+                        originalWidth, originalHeight));
+
+        int w = Math.max(1, Math.round(originalWidth * scale));
+        int h = Math.max(1, Math.round(originalHeight * scale));
+
+        Bitmap small = Bitmap.createScaledBitmap(
+                originalBitmap, w, h, true);
+
+        int[] input = new int[w * h];
+        int[] output = new int[w * h];
+
+        small.getPixels(input, 0, w, 0, 0, w, h);
+
+        float minSide = Math.min(w, h);
+
+        float faceX = w * 0.50f;
+        float faceY = h * 0.43f;
+        float faceRadius = minSide * 0.24f;
+
+        float mouthX = w * 0.50f;
+        float mouthY = h * 0.63f;
+        float mouthRadius = minSide * 0.075f;
+
+        float noseX = w * 0.50f;
+        float noseY = h * 0.49f;
+        float noseRadius = minSide * 0.085f;
+
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                float sx = x;
+                float sy = y;
+
+                if (effect.equals("skinny")
+                        || effect.equals("wide")) {
+                    float dx = x - faceX;
+                    float dy = y - faceY;
+
+                    float distance = (float) Math.sqrt(
+                            dx * dx + dy * dy);
+
+                    if (distance < faceRadius) {
+                        float t = 1f - distance / faceRadius;
+
+                        float strength = effect.equals("skinny")
+                                ? 0.28f : -0.28f;
+
+                        sx = faceX
+                                + dx * (1f + strength * t * t);
+                    }
+
+                } else if (effect.equals("tiny")) {
+                    float dx = x - mouthX;
+                    float dy = y - mouthY;
+
+                    float distance = (float) Math.sqrt(
+                            dx * dx + dy * dy);
+
+                    if (distance < mouthRadius) {
+                        float t = 1f - distance / mouthRadius;
+                        float factor = 1f + 0.65f * t * t;
+
+                        sx = mouthX + dx * factor;
+                        sy = mouthY + dy * factor;
+                    }
+
+                } else if (effect.equals("nose")) {
+                    float dx = x - noseX;
+                    float dy = y - noseY;
+
+                    float distance = (float) Math.sqrt(
+                            dx * dx + dy * dy);
+
+                    if (distance < noseRadius) {
+                        float t = 1f - distance / noseRadius;
+
+                        sy = noseY
+                                + dy * (1f + 0.90f * t * t);
+                    }
+                }
+
+                int sourceX = Math.max(0,
+                        Math.min(w - 1, Math.round(sx)));
+                int sourceY = Math.max(0,
+                        Math.min(h - 1, Math.round(sy)));
+
+                output[y * w + x] =
+                        input[sourceY * w + sourceX];
+            }
+        }
+
+        Bitmap result = Bitmap.createBitmap(
+                w, h, Bitmap.Config.ARGB_8888);
+
+        result.setPixels(output, 0, w, 0, 0, w, h);
+
+        if (small != originalBitmap && !small.isRecycled()) {
+            small.recycle();
+        }
+
+        currentBitmap = result;
+        photoPreview.setImageBitmap(currentBitmap);
+    }
+
     private float[] bulge(
-        float x, float y,
-        float centerX, float centerY,
-        float radius, float strength) {
+            float x, float y,
+            float centerX, float centerY,
+            float radius, float strength) {
 
         float dx = x - centerX;
         float dy = y - centerY;
-        float distance = (float) Math.sqrt(dx * dx + dy * dy);
+
+        float distance = (float) Math.sqrt(
+                dx * dx + dy * dy);
 
         if (distance >= radius || radius <= 0) {
-            return new float[] { x, y };
+            return new float[]{x, y};
         }
 
         float amount = 1.0f - distance / radius;
@@ -409,33 +543,33 @@ public class MainActivity extends Activity {
         float sourceX = centerX + dx / scale;
         float sourceY = centerY + dy / scale;
 
-        return new float[] { sourceX, sourceY };
+        return new float[]{sourceX, sourceY};
     }
 
     private void savePhoto() {
         if (currentBitmap == null) {
             Toast.makeText(this, "Choose a photo first",
-                Toast.LENGTH_SHORT).show();
+                    Toast.LENGTH_SHORT).show();
             return;
         }
 
         try {
             String saved = MediaStore.Images.Media.insertImage(
-                getContentResolver(),
-                currentBitmap,
-                "FaceVoice_" + System.currentTimeMillis(),
-                "Edited with Face Voice Studio");
+                    getContentResolver(),
+                    currentBitmap,
+                    "FaceVoice_" + System.currentTimeMillis(),
+                    "Edited with Face Voice Studio");
 
             if (saved != null) {
                 Toast.makeText(this, "Photo saved to your gallery!",
-                    Toast.LENGTH_LONG).show();
+                        Toast.LENGTH_LONG).show();
             } else {
                 Toast.makeText(this, "Could not save photo",
-                    Toast.LENGTH_LONG).show();
+                        Toast.LENGTH_LONG).show();
             }
         } catch (Exception e) {
             Toast.makeText(this, "Could not save photo",
-                Toast.LENGTH_LONG).show();
+                    Toast.LENGTH_LONG).show();
         }
     }
 
@@ -444,7 +578,7 @@ public class MainActivity extends Activity {
 
         layout.addView(makeText("Voice Effects", 26));
         layout.addView(makeText(
-            "Voice recording and effects will be added next.", 17));
+                "Voice recording and effects will be added next.", 17));
 
         Button back = makeButton("Back to Home");
         back.setOnClickListener(v -> showHome());
