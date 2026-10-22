@@ -97,7 +97,6 @@ public class MainActivity extends Activity {
 
         layout.addView(gallery);
         layout.addView(camera);
-
         layout.addView(photoPreview,
             new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 400));
@@ -114,6 +113,12 @@ public class MainActivity extends Activity {
 
         addFilterButton(layout, "Beauty Smooth", "smooth");
         addFilterButton(layout, "Beauty Brighten", "beauty");
+
+        layout.addView(makeText("FUNNY FACE EFFECTS", 20));
+
+        addFilterButton(layout, "Big Head", "bighead");
+        addFilterButton(layout, "Big Eyes", "bigeyes");
+        addFilterButton(layout, "Funny Face", "funny");
 
         Button save = makeButton("Save Photo");
         save.setOnClickListener(v -> savePhoto());
@@ -232,16 +237,27 @@ public class MainActivity extends Activity {
             int width = originalBitmap.getWidth();
             int height = originalBitmap.getHeight();
 
-            int smallWidth = Math.max(1, width / 5);
-            int smallHeight = Math.max(1, height / 5);
-
             Bitmap small = Bitmap.createScaledBitmap(
-                originalBitmap, smallWidth, smallHeight, true);
+                originalBitmap,
+                Math.max(1, width / 5),
+                Math.max(1, height / 5),
+                true);
 
             currentBitmap = Bitmap.createScaledBitmap(
                 small, width, height, true);
 
+            if (small != currentBitmap) {
+                small.recycle();
+            }
+
             photoPreview.setImageBitmap(currentBitmap);
+            return;
+        }
+
+        if (filter.equals("bighead")
+                || filter.equals("bigeyes")
+                || filter.equals("funny")) {
+            applyFunnyEffect(filter);
             return;
         }
 
@@ -299,6 +315,101 @@ public class MainActivity extends Activity {
 
         currentBitmap = result;
         photoPreview.setImageBitmap(currentBitmap);
+    }
+
+    private void applyFunnyEffect(String effect) {
+        int width = originalBitmap.getWidth();
+        int height = originalBitmap.getHeight();
+
+        Bitmap result = Bitmap.createBitmap(
+            width, height, Bitmap.Config.ARGB_8888);
+
+        float minSide = Math.min(width, height);
+
+        float headX = width * 0.50f;
+        float headY = height * 0.43f;
+        float headRadius = minSide * 0.43f;
+
+        float leftEyeX = width * 0.38f;
+        float rightEyeX = width * 0.62f;
+        float eyeY = height * 0.39f;
+        float eyeRadius = minSide * 0.15f;
+
+        float mouthX = width * 0.50f;
+        float mouthY = height * 0.63f;
+        float mouthRadius = minSide * 0.13f;
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                float sx = x;
+                float sy = y;
+
+                if (effect.equals("bighead")
+                        || effect.equals("funny")) {
+                    float[] point = bulge(
+                        sx, sy, headX, headY,
+                        headRadius, 0.75f);
+                    sx = point[0];
+                    sy = point[1];
+                }
+
+                if (effect.equals("bigeyes")
+                        || effect.equals("funny")) {
+                    float[] left = bulge(
+                        sx, sy, leftEyeX, eyeY,
+                        eyeRadius, 0.90f);
+                    sx = left[0];
+                    sy = left[1];
+
+                    float[] right = bulge(
+                        sx, sy, rightEyeX, eyeY,
+                        eyeRadius, 0.90f);
+                    sx = right[0];
+                    sy = right[1];
+                }
+
+                if (effect.equals("funny")) {
+                    float[] mouth = bulge(
+                        sx, sy, mouthX, mouthY,
+                        mouthRadius, 0.65f);
+                    sx = mouth[0];
+                    sy = mouth[1];
+                }
+
+                int sourceX = Math.max(0,
+                    Math.min(width - 1, Math.round(sx)));
+                int sourceY = Math.max(0,
+                    Math.min(height - 1, Math.round(sy)));
+
+                result.setPixel(
+                    x, y, originalBitmap.getPixel(sourceX, sourceY));
+            }
+        }
+
+        currentBitmap = result;
+        photoPreview.setImageBitmap(currentBitmap);
+    }
+
+    private float[] bulge(
+        float x, float y,
+        float centerX, float centerY,
+        float radius, float strength) {
+
+        float dx = x - centerX;
+        float dy = y - centerY;
+        float distance = (float) Math.sqrt(dx * dx + dy * dy);
+
+        if (distance >= radius || radius <= 0) {
+            return new float[] { x, y };
+        }
+
+        float amount = 1.0f - distance / radius;
+        float scale = 1.0f + strength * amount * amount;
+
+        float sourceX = centerX + dx / scale;
+        float sourceY = centerY + dy / scale;
+
+        return new float[] { sourceX, sourceY };
     }
 
     private void savePhoto() {
