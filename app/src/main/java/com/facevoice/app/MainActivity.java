@@ -4,20 +4,27 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.net.Uri;
+import android.provider.MediaStore;
 import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
+import android.widget.ScrollView;
+import java.io.InputStream;
 
 public class MainActivity extends Activity {
 
     private static final int REQUEST_GALLERY = 100;
     private static final int REQUEST_CAMERA = 101;
+
     private ImageView photoPreview;
+    private Bitmap originalBitmap;
+    private Bitmap currentBitmap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,7 +36,7 @@ public class MainActivity extends Activity {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setGravity(Gravity.CENTER);
-        layout.setPadding(32, 32, 32, 32);
+        layout.setPadding(24, 24, 24, 24);
         layout.setBackgroundColor(Color.rgb(18, 20, 32));
         return layout;
     }
@@ -40,6 +47,7 @@ public class MainActivity extends Activity {
         view.setTextSize(size);
         view.setTextColor(Color.WHITE);
         view.setGravity(Gravity.CENTER);
+        view.setPadding(0, 8, 0, 8);
         return view;
     }
 
@@ -63,16 +71,17 @@ public class MainActivity extends Activity {
 
         layout.addView(face);
         layout.addView(voice);
-
         setContentView(layout);
     }
 
     private void showFaceScreen() {
+        ScrollView scroll = new ScrollView(this);
         LinearLayout layout = createLayout();
+        layout.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
 
-        layout.addView(makeText("Face Effects", 26));
+        layout.addView(makeText("Face Effects Studio", 25));
         layout.addView(makeText(
-            "Choose a photo or take a new one.", 16));
+            "Choose a photo, then apply a filter.", 16));
 
         Button gallery = makeButton("Choose from Gallery");
         Button camera = makeButton("Take a Photo");
@@ -86,17 +95,42 @@ public class MainActivity extends Activity {
         gallery.setOnClickListener(v -> openGallery());
         camera.setOnClickListener(v -> openCamera());
 
-        Button back = makeButton("Back to Home");
-        back.setOnClickListener(v -> showHome());
-
         layout.addView(gallery);
         layout.addView(camera);
         layout.addView(photoPreview,
             new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+                LinearLayout.LayoutParams.MATCH_PARENT, 400));
 
+        layout.addView(makeText("PHOTO FILTERS", 20));
+
+        addFilterButton(layout, "Original", "original");
+        addFilterButton(layout, "Black & White", "bw");
+        addFilterButton(layout, "Sepia", "sepia");
+        addFilterButton(layout, "Brighten", "brighten");
+        addFilterButton(layout, "Vintage", "vintage");
+
+        Button save = makeButton("Save Photo");
+        save.setOnClickListener(v -> savePhoto());
+        layout.addView(save);
+
+        Button back = makeButton("Back to Home");
+        back.setOnClickListener(v -> showHome());
         layout.addView(back);
-        setContentView(layout);
+
+        scroll.addView(layout);
+        setContentView(scroll);
+
+        if (originalBitmap != null) {
+            photoPreview.setImageBitmap(currentBitmap);
+        }
+    }
+
+    private void addFilterButton(
+        LinearLayout layout, String label, String filter) {
+
+        Button button = makeButton(label);
+        button.setOnClickListener(v -> applyFilter(filter));
+        layout.addView(button);
     }
 
     private void openGallery() {
@@ -115,7 +149,7 @@ public class MainActivity extends Activity {
 
     private void openCamera() {
         Intent intent = new Intent(
-            android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+            MediaStore.ACTION_IMAGE_CAPTURE);
 
         if (intent.resolveActivity(getPackageManager()) != null) {
             startActivityForResult(intent, REQUEST_CAMERA);
@@ -135,24 +169,138 @@ public class MainActivity extends Activity {
             return;
         }
 
-        if (requestCode == REQUEST_GALLERY) {
-            Uri imageUri = data.getData();
+        try {
+            Bitmap bitmap = null;
 
-            if (imageUri != null && photoPreview != null) {
-                photoPreview.setImageURI(imageUri);
+            if (requestCode == REQUEST_GALLERY) {
+                Uri imageUri = data.getData();
+
+                if (imageUri != null) {
+                    InputStream stream =
+                        getContentResolver().openInputStream(imageUri);
+
+                    if (stream != null) {
+                        bitmap = BitmapFactory.decodeStream(stream);
+                        stream.close();
+                    }
+                }
+            } else if (requestCode == REQUEST_CAMERA) {
+                Object result = data.getExtras() == null
+                    ? null : data.getExtras().get("data");
+
+                if (result instanceof Bitmap) {
+                    bitmap = (Bitmap) result;
+                }
             }
 
-        } else if (requestCode == REQUEST_CAMERA) {
-            Object result = data.getExtras() == null
-                ? null : data.getExtras().get("data");
-
-            if (result instanceof Bitmap && photoPreview != null) {
-                photoPreview.setImageBitmap((Bitmap) result);
+            if (bitmap != null) {
+                originalBitmap = bitmap.copy(
+                    Bitmap.Config.ARGB_8888, false);
+                currentBitmap = originalBitmap;
+                showFaceScreen();
             } else {
-                Toast.makeText(this,
-                    "The camera did not return a preview photo",
+                Toast.makeText(this, "Could not load that photo",
                     Toast.LENGTH_SHORT).show();
             }
+
+        } catch (Exception e) {
+            Toast.makeText(this, "Unable to load photo",
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void applyFilter(String filter) {
+        if (originalBitmap == null) {
+            Toast.makeText(this, "Choose a photo first",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (filter.equals("original")) {
+            currentBitmap = originalBitmap;
+            photoPreview.setImageBitmap(currentBitmap);
+            return;
+        }
+
+        int width = originalBitmap.getWidth();
+        int height = originalBitmap.getHeight();
+
+        Bitmap result = Bitmap.createBitmap(
+            width, height, Bitmap.Config.ARGB_8888);
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = originalBitmap.getPixel(x, y);
+
+                int a = Color.alpha(pixel);
+                int r = Color.red(pixel);
+                int g = Color.green(pixel);
+                int b = Color.blue(pixel);
+
+                if (filter.equals("bw")) {
+                    int gray = (int) (0.299 * r
+                        + 0.587 * g + 0.114 * b);
+                    r = g = b = gray;
+
+                } else if (filter.equals("sepia")) {
+                    int nr = (int) (0.393 * r
+                        + 0.769 * g + 0.189 * b);
+                    int ng = (int) (0.349 * r
+                        + 0.686 * g + 0.168 * b);
+                    int nb = (int) (0.272 * r
+                        + 0.534 * g + 0.131 * b);
+
+                    r = Math.min(255, nr);
+                    g = Math.min(255, ng);
+                    b = Math.min(255, nb);
+
+                } else if (filter.equals("brighten")) {
+                    r = Math.min(255, r + 35);
+                    g = Math.min(255, g + 35);
+                    b = Math.min(255, b + 35);
+
+                } else if (filter.equals("vintage")) {
+                    int nr = (int) (0.90 * r + 20);
+                    int ng = (int) (0.80 * g + 15);
+                    int nb = (int) (0.70 * b + 10);
+
+                    r = Math.min(255, nr);
+                    g = Math.min(255, ng);
+                    b = Math.min(255, nb);
+                }
+
+                result.setPixel(x, y, Color.argb(a, r, g, b));
+            }
+        }
+
+        currentBitmap = result;
+        photoPreview.setImageBitmap(currentBitmap);
+    }
+
+    private void savePhoto() {
+        if (currentBitmap == null) {
+            Toast.makeText(this, "Choose a photo first",
+                Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            String saved = MediaStore.Images.Media.insertImage(
+                getContentResolver(),
+                currentBitmap,
+                "FaceVoice_" + System.currentTimeMillis(),
+                "Edited with Face Voice Studio");
+
+            if (saved != null) {
+                Toast.makeText(this, "Photo saved to your gallery!",
+                    Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "Could not save photo",
+                    Toast.LENGTH_LONG).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not save photo",
+                Toast.LENGTH_LONG).show();
         }
     }
 
