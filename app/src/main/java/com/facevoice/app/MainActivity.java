@@ -109,15 +109,18 @@ public class MainActivity extends Activity {
         return button;
     }
 
+    // WORLDLINK HOME SCREEN
+    // Existing Face Effects, Voice Effects and Video Call are preserved.
     private void showHome() {
         LinearLayout layout = createLayout();
         layout.setGravity(Gravity.CENTER);
 
-        TextView title = makeText("FACE & VOICE STUDIO", 27);
+        TextView title = makeText("WORLDLINK", 32);
         title.setGravity(Gravity.CENTER);
 
         TextView subtitle = makeText(
-                "Create funny photos and transform your voice", 16);
+                "Connect with the world. Create, share, and discover.",
+                16);
         subtitle.setGravity(Gravity.CENTER);
 
         layout.addView(title);
@@ -126,7 +129,7 @@ public class MainActivity extends Activity {
         layout.addView(makeButton("Face Effects", this::showFaceScreen));
         layout.addView(makeButton("Voice Effects", this::showVoiceScreen));
 
-        // Open the video calling screen.
+        // Keep the existing video-calling feature connected.
         layout.addView(makeButton("Video Call", () ->
                 startActivity(new Intent(
                         MainActivity.this, CallActivity.class))));
@@ -1070,4 +1073,4 @@ public class MainActivity extends Activity {
 
         super.onDestroy();
     }
-}
+        }
