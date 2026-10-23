@@ -126,6 +126,11 @@ public class MainActivity extends Activity {
         layout.addView(makeButton("Face Effects", this::showFaceScreen));
         layout.addView(makeButton("Voice Effects", this::showVoiceScreen));
 
+        // Open the video calling screen.
+        layout.addView(makeButton("Video Call", () ->
+                startActivity(new Intent(
+                        MainActivity.this, CallActivity.class))));
+
         setContentView(layout);
     }
 
